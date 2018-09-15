@@ -5,7 +5,7 @@
 * cmake >3.5 is required for AF; install cmake 3.5 or above from source if you don't have it; configure, make, and install
 * configure AF using cmake
 * `make -j8` (*number of threads*)
-* if curl give error for unsupported protocol, these are few things that you could try:
+* if curl gives error for unsupported protocol, these are few things that you could try:
   - install libcurl from source and configure with `--with-ssl` option, make, and install
   - change the single quotes to double quotes for url in `boost_compute-urlinfo.txt` file
   - download the zip file at the url and rename it appropriately
@@ -22,7 +22,7 @@
 * git clone and create build dir
 * configure using cmake
 * build and install using make
-* if curl give error for unsupported protocol, these are few things that you could try:
+* if curl gives error for unsupported protocol, these are few things that you could try:
   - install libcurl from source and configure with `--with-ssl` option, make, and install
   - change single quotes to double quotes for urls of tbb, catch, and spdlog in `./externals/src/....`
   - download the zip files from the urls and rename them appropriately
