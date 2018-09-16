@@ -10,113 +10,102 @@
 using namespace af;
 using namespace tiledb;
 
-// Name of array.
-std::string skeleton("skeleton");
-std::string dilated("dilated");
+std::string attri("voxel"); // attribute name
 
-void create_array() {
-  // Create a TileDB context.
-  Context ctx;
+// creates TileDB array, arguments specify numbers per dimension
+void create_tiledb_array(const std::string array_name, const int voxel_dim, const int tile_dim)
+{
+    // Create a TileDB context.
+    Context ctx;
 
-  // The array will be 4x4 with dimensions "rows" and "cols", with domain [1,4].
-  Domain domain(ctx);
-  domain.add_dimension(Dimension::create<int>(ctx, "rows", {{0, 3}}, 4))
-      .add_dimension(Dimension::create<int>(ctx, "cols", {{0, 3}}, 4))
-      .add_dimension(Dimension::create<int>(ctx, "pages", {{0, 3}}, 4));
+    // The array will be 4x4 with dimensions "rows" and "cols", with domain [1,4].
+    Domain domain(ctx);
+    domain.add_dimension(Dimension::create<int>(ctx, "rows", {{0, voxel_dim-1}}, tile_dim))
+        .add_dimension(Dimension::create<int>(ctx, "cols", {{0, voxel_dim-1}}, tile_dim))
+        .add_dimension(Dimension::create<int>(ctx, "pages", {{0, voxel_dim-1}}, tile_dim));
 
-  // The array will be sparse.
-  ArraySchema schema(ctx, TILEDB_SPARSE);
-  schema.set_domain(domain).set_order({{TILEDB_ROW_MAJOR, TILEDB_ROW_MAJOR}});
+    // The array will be sparse.
+    ArraySchema schema(ctx, TILEDB_SPARSE);
+    schema.set_domain(domain).set_order({{TILEDB_ROW_MAJOR, TILEDB_ROW_MAJOR}});
 
-  // Add a single attribute "a" so each (i,j) cell can store an integer.
-  schema.add_attribute(Attribute::create<int>(ctx, "voxel"));
+    // Add a single attribute "a" so each (i,j) cell can store an integer.
+    schema.add_attribute(Attribute::create<char>(ctx, attri));
 
-  // Create the (empty) array on disk.
-  Array::create(skeleton, schema);
-  Array::create(dilated, schema);
+    // Create the (empty) array on disk.
+    Array::create(array_name, schema);
 }
 
-void write_array() {
-  Context ctx;
+void write_tiledb_array(const std::string array_name, std::vector<char>& data,
+                                std::vector<int>& coords)
+{
+    // Create a TileDB context.
+    Context ctx;
 
-  // Write some simple data to cells (1, 1), (2, 4) and (2, 3).
-  std::vector<int> coords = {0, 0, 0, 1, 3, 0, 1, 2, 0};
-  std::vector<int> sk_data = {1, 4, 3};
-  std::vector<int> di_data = {10, 40, 30};
+    // Open the array for writing and create the query.
+    Array array(ctx, array_name, TILEDB_WRITE);
+    Query query(ctx, array, TILEDB_WRITE);
+    query.set_layout(TILEDB_UNORDERED)
+        .set_buffer(attri, data)
+        .set_coordinates(coords);
 
-  // Open the array for writing and create the query.
-  Array sk_array(ctx, skeleton, TILEDB_WRITE);
-  Query sk_query(ctx, sk_array, TILEDB_WRITE);
-  sk_query.set_layout(TILEDB_UNORDERED)
-      .set_buffer("voxel", sk_data)
-      .set_coordinates(coords);
-
-  // Perform the write and close the array.
-  sk_query.submit();
-  sk_array.close();
-
-  // Open the array for writing and create the query.
-  Array di_array(ctx, dilated, TILEDB_WRITE);
-  Query di_query(ctx, di_array, TILEDB_WRITE);
-  di_query.set_layout(TILEDB_UNORDERED)
-      .set_buffer("voxel", di_data)
-      .set_coordinates(coords);
-
-  // Perform the write and close the array.
-  di_query.submit();
-  di_array.close();
+    // Perform the write and close the array.
+    query.submit();
+    array.close();
 }
 
-void read_array(std::string array_name) {
-  Context ctx;
+void read_tiledb_array(const std::string array_name, const std::vector<int> slice_coords,
+                        std::vector<char>& data, std::vector<int>& coords)
+{
+    // Create a TileDB context.
+    Context ctx;
 
-  // Prepare the array for reading
-  Array array(ctx, array_name, TILEDB_READ);
+    // Prepare the array for reading
+    Array array(ctx, array_name, TILEDB_READ);
 
-  // Slice only rows 1, 2 and cols 2, 3, 4
-  const std::vector<int> subarray = {0, 1, 1, 3, 0, 1};
+    // Prepare the vector that will hold the result.
+    // We take an upper bound on the result size, as we do not
+    // know a priori how big it is (since the array is sparse)
+    auto max_el = array.max_buffer_elements(slice_coords);
+    data.resize(max_el[attri].second);
+    coords.resize(max_el[TILEDB_COORDS].second);
 
-  // Prepare the vector that will hold the result.
-  // We take an upper bound on the result size, as we do not
-  // know a priori how big it is (since the array is sparse)
-  auto max_el = array.max_buffer_elements(subarray);
-  std::vector<int> data(max_el["voxel"].second);
-  std::vector<int> coords(max_el[TILEDB_COORDS].second);
+    // Prepare the query
+    Query query(ctx, array, TILEDB_READ);
+    query.set_subarray(slice_coords)
+        .set_layout(TILEDB_ROW_MAJOR)
+        .set_buffer(attri, data)
+        .set_coordinates(coords);
 
-  // Prepare the query
-  Query query(ctx, array, TILEDB_READ);
-  query.set_subarray(subarray)
-      .set_layout(TILEDB_ROW_MAJOR)
-      .set_buffer("voxel", data)
-      .set_coordinates(coords);
+    // Submit the query and close the array.
+    query.submit();
+    array.close();
 
-  // Submit the query and close the array.
-  query.submit();
-  array.close();
-
-  // Print out the results.
-  auto result_num = (int)query.result_buffer_elements()["voxel"].second;
-  for (int r = 0; r < result_num; r++) {
-    int i = coords[3 * r], j = coords[3 * r + 1], k = coords[3 * r + 2];
-    int a = data[r];
-    std::cout << "Cell (" << i << ", " << j << ", " << k << ") has data " << a << "\n";
-  }
+    // Print out the results.
+    std::cout << array_name << " data:" << std::endl;
+    auto result_num = (int)query.result_buffer_elements()[attri].second;
+    std::cout << "Number of entries = " << result_num << std::endl;
+    data.resize(result_num);
+    coords.resize(result_num*3);
+    //for (int r = 0; r < result_num; r++) {
+    //    std::cout << "(" << coords[3*r] << ", " << coords[3*r+1] << ", "
+    //         << coords[3*r+2] << ") : " << data[r] << std::endl;
+    //}
 }
 
 // creates a 3D spherical mask of given radius (number of voxels)
-array create_mask(int radius)
+array create_mask(const int radius)
 {
     int sz = 2*radius + 1;
     int c = radius; //center coordinate; x = y = z = c;
     int sqrad = (radius-1)*(radius-1), sqdist;
     
-    array mask = constant(0, sz, sz, sz, u8);
+    array mask = constant(0, sz, sz, sz, b8);
     for (int x = 0; x < sz; x++)
         for (int y = 0; y < sz; y++)
             for (int z = 0; z < sz; z++)
             {
                 sqdist = (x-c)*(x-c) + (y-c)*(y-c) + (z-c)*(z-c);
-                if (sqdist <= sqrad) mask(x, y, z) = 1;
+                if (sqdist <= sqrad) mask(x, y, z) = true;
             }
     return mask;
 }
@@ -146,38 +135,69 @@ array create_mask(int radius)
 }
 */
 
+array create_af_array(const int dim, const std::vector<int>& coords)
+{
+    array block = constant(0, dim, dim, dim, b8);
+    for (int i = 0; i < coords.size()/3; i++)
+        block(coords[3*i], coords[3*i+1], coords[3*i+2], 0) = true;
+    return block;
+}
+
+void get_true_coords(const array& block, std::vector<int>& coords, int offset = 0)
+{
+    dim4 dims = block.dims();
+    array nz = where(block);
+    int idx, x, y, z;
+    for (int i = 0; i < nz.dims()[0]; i++)
+    {
+        //TODO: check if linear index to array index is correct
+        idx = sum<int>(nz(i));
+        x =  idx % dims[0];
+        idx /= dims[0];
+        y = idx % dims[1];
+        idx /= dims[1];
+        z = idx;
+        coords.insert(coords.end(), {x+offset, y+offset, z+offset});
+    }
+}
+/*
+void get_true_coords(const array& block, std::vector<int>& coords, int offset = 0)
+{
+    dim4 dims = block.dims();
+    for (int i = 0; i < dims[0]; i++)
+        for (int j = 0; j < dims[1]; j++)
+            for (int k = 0; k < dims[2]; k++)
+                if (block(i, j, k).scalar<bool>())
+                //if (sum<int>(block(i, j, k)) > 0)
+                    coords.insert(coords.end(), {i+offset, j+offset, k+offset});
+}*/
+
 // dilates 3D array block using the 3D mask
-array dilate_with_mask(array block, array mask, bool useFFT = true, bool usePad = true)
+array dilate_with_mask(const array& block, const array& mask, bool usePad = true)
 {
     array out;
-    if (useFFT)
-    {
-        if (usePad)
-            out = fftConvolve3(block, mask, AF_CONV_EXPAND); // with padding, expand
-        else
-            out = fftConvolve3(block, mask); // without padding, same
-        out = out >= 1;
-    }
+    if (usePad)
+        out = fftConvolve3(block, mask, AF_CONV_EXPAND); // with padding, expand
     else
-        out = dilate3(block, mask); // can't use padding
-        
+        out = fftConvolve3(block, mask); // without padding, same
+    out = out >= 1;
     return out;
 }
 
 
 static void dilate_test()
 {
-    int block_size = 256;
-    int mask_radius = 15;
+    int block_size = 51;
+    int mask_radius = 3;
     
-    array block = constant(0, block_size, block_size, block_size, u8);
+    array block = constant(0, block_size, block_size, block_size, b8);
     
     array mask = create_mask(mask_radius);
     //af_print(mask);
     
     // create a diagonal line for testing
     for (int i = 3; i < block_size-3; i++)
-        block(i, i, i) = 1;
+        block(i, i, i) = true;
     
     clock_t s1, e1, s2, e2;
     int N = 1;
@@ -203,7 +223,7 @@ static void dilate_test()
     //for (int i = 0; i < block_size; i += 64)
     //    saveImage("testf.png", fc.slice(i));
         
-    //saveImage("testf050.png", fc.slice(50));
+    //saveImage("testf050.png", fc.slice(25));
     
     std::cout << "Dilate3 time = " << elapsed1/N << " ms." << std::endl;
     std::cout << "FFT convolve3 time = " << elapsed2/N << " ms." << std::endl;
@@ -219,25 +239,48 @@ int main(int argc, char** argv)
     try {
         af::info();
         af::setDevice(device);
-        printf("** Dilate using ArrayFire **\n\n");
-        dilate_test();
+        printf("** Dilate using ArrayFire and TileDB **\n");
+        //dilate_test();
 
     } catch (af::exception& e) {
         fprintf(stderr, "%s\n", e.what());
         throw;
     }
     
+    int voxel_dim = 256;
+    int tile_dim = 64;
+    
+    // Name of array.
+    std::string skeleton("Skeleton");
+    std::string dilated("Dilated");
 
     Context ctx;
 
     if (Object::object(ctx, skeleton).type() != Object::Type::Array) {
-        create_array();
+        create_tiledb_array(skeleton, voxel_dim, tile_dim);
+        create_tiledb_array(dilated, voxel_dim, tile_dim);
     }
     
-    write_array();
+    std::vector<int> coords;
+    for (int i = 20; i < 236; i++)
+        coords.insert(coords.end(), {i, i, i});
+    std::vector<char> data(coords.size()/3, '1');
+    write_tiledb_array(skeleton, data, coords);
 
-    read_array(skeleton);
-    read_array(dilated);
+    std::vector<char> sk_data, di_data;
+    std::vector<int> sk_coords, di_coords;
+    std::vector<int> slice_coords = {0, tile_dim-1, 0, tile_dim-1, 0, tile_dim-1};
+    read_tiledb_array(skeleton, slice_coords, sk_data, sk_coords);
+    
+    array block = create_af_array(tile_dim, sk_coords);
+    array mask = create_mask(10);
+    array out = dilate_with_mask(block, mask, false);
+    
+    get_true_coords(out, di_coords, 0);
+    std::vector<char> datad(di_coords.size()/3, '1');
+    write_tiledb_array(dilated, datad, di_coords);
+        
+    read_tiledb_array(dilated, slice_coords, di_data, di_coords);
 
     return 0;
 }
