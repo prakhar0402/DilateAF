@@ -33,22 +33,6 @@ project(DilateAF
 find_package(ArrayFire)
 find_package(TileDB)
 
-if(ArrayFire_CPU_FOUND)
-  add_executable(dilateAF_cpu ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
-  target_link_libraries(dilateAF_cpu ArrayFire::afcpu)
-endif()
-
-if(ArrayFire_CUDA_FOUND)
-  add_executable(dilateAF_cuda ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
-  target_link_libraries(dilateAF_cuda ArrayFire::afcuda)
-endif()
-
-if(ArrayFire_OpenCL_FOUND)
-  add_executable(dilateAF_opencl ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
-  target_link_libraries(dilateAF_opencl ArrayFire::afopencl)
-endif()
-
-
 # Set C++11 as required standard for all C++ targets.
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -64,12 +48,25 @@ else()
   add_compile_options(-Wno-error=format)
 endif()
 
-add_executable(test_tdb ${CMAKE_CURRENT_SOURCE_DIR}/src/tdb_main.cpp)
+if(ArrayFire_CPU_FOUND)
+  add_executable(dilateAF_cpu ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
+  target_link_libraries(dilateAF_cpu ArrayFire::afcpu)
+endif()
+
+if(ArrayFire_CUDA_FOUND)
+  add_executable(dilateAF_cuda ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
+  target_link_libraries(dilateAF_cuda ArrayFire::afcuda)
+endif()
+
+if(ArrayFire_OpenCL_FOUND)
+  add_executable(dilateAF_opencl ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
+  target_link_libraries(dilateAF_opencl ArrayFire::afopencl)
+endif()
 
 #target_include_directories(test_tdb PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/../")
-target_link_libraries(test_tdb TileDB::tiledb_shared)
+target_link_libraries(dilateAF_cpu TileDB::tiledb_shared)
 
 # On Linux, must explicitly link -lpthread -ldl in order for static linking
 # to libzstd or libcurl to work.
-target_link_libraries(test_tdb pthread dl)
+target_link_libraries(dilateAF_cpu pthread dl)
 

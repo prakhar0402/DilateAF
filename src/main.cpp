@@ -1,12 +1,107 @@
 #include <stdio.h>
-#include <arrayfire.h>
-#include <af/util.h>
 #include <cstdlib>
 #include <time.h>
 #include <math.h>
 #include <iostream>
+#include <tiledb/tiledb>
+#include <arrayfire.h>
+#include <af/util.h>
 
 using namespace af;
+using namespace tiledb;
+
+// Name of array.
+std::string skeleton("skeleton");
+std::string dilated("dilated");
+
+void create_array() {
+  // Create a TileDB context.
+  Context ctx;
+
+  // The array will be 4x4 with dimensions "rows" and "cols", with domain [1,4].
+  Domain domain(ctx);
+  domain.add_dimension(Dimension::create<int>(ctx, "rows", {{0, 3}}, 4))
+      .add_dimension(Dimension::create<int>(ctx, "cols", {{0, 3}}, 4))
+      .add_dimension(Dimension::create<int>(ctx, "pages", {{0, 3}}, 4));
+
+  // The array will be sparse.
+  ArraySchema schema(ctx, TILEDB_SPARSE);
+  schema.set_domain(domain).set_order({{TILEDB_ROW_MAJOR, TILEDB_ROW_MAJOR}});
+
+  // Add a single attribute "a" so each (i,j) cell can store an integer.
+  schema.add_attribute(Attribute::create<int>(ctx, "voxel"));
+
+  // Create the (empty) array on disk.
+  Array::create(skeleton, schema);
+  Array::create(dilated, schema);
+}
+
+void write_array() {
+  Context ctx;
+
+  // Write some simple data to cells (1, 1), (2, 4) and (2, 3).
+  std::vector<int> coords = {0, 0, 0, 1, 3, 0, 1, 2, 0};
+  std::vector<int> sk_data = {1, 4, 3};
+  std::vector<int> di_data = {10, 40, 30};
+
+  // Open the array for writing and create the query.
+  Array sk_array(ctx, skeleton, TILEDB_WRITE);
+  Query sk_query(ctx, sk_array, TILEDB_WRITE);
+  sk_query.set_layout(TILEDB_UNORDERED)
+      .set_buffer("voxel", sk_data)
+      .set_coordinates(coords);
+
+  // Perform the write and close the array.
+  sk_query.submit();
+  sk_array.close();
+
+  // Open the array for writing and create the query.
+  Array di_array(ctx, dilated, TILEDB_WRITE);
+  Query di_query(ctx, di_array, TILEDB_WRITE);
+  di_query.set_layout(TILEDB_UNORDERED)
+      .set_buffer("voxel", di_data)
+      .set_coordinates(coords);
+
+  // Perform the write and close the array.
+  di_query.submit();
+  di_array.close();
+}
+
+void read_array(std::string array_name) {
+  Context ctx;
+
+  // Prepare the array for reading
+  Array array(ctx, array_name, TILEDB_READ);
+
+  // Slice only rows 1, 2 and cols 2, 3, 4
+  const std::vector<int> subarray = {0, 1, 1, 3, 0, 1};
+
+  // Prepare the vector that will hold the result.
+  // We take an upper bound on the result size, as we do not
+  // know a priori how big it is (since the array is sparse)
+  auto max_el = array.max_buffer_elements(subarray);
+  std::vector<int> data(max_el["voxel"].second);
+  std::vector<int> coords(max_el[TILEDB_COORDS].second);
+
+  // Prepare the query
+  Query query(ctx, array, TILEDB_READ);
+  query.set_subarray(subarray)
+      .set_layout(TILEDB_ROW_MAJOR)
+      .set_buffer("voxel", data)
+      .set_coordinates(coords);
+
+  // Submit the query and close the array.
+  query.submit();
+  array.close();
+
+  // Print out the results.
+  auto result_num = (int)query.result_buffer_elements()["voxel"].second;
+  for (int r = 0; r < result_num; r++) {
+    int i = coords[3 * r], j = coords[3 * r + 1], k = coords[3 * r + 2];
+    int a = data[r];
+    std::cout << "Cell (" << i << ", " << j << ", " << k << ") has data " << a << "\n";
+  }
+}
 
 // creates a 3D spherical mask of given radius (number of voxels)
 array create_mask(int radius)
@@ -131,6 +226,18 @@ int main(int argc, char** argv)
         fprintf(stderr, "%s\n", e.what());
         throw;
     }
+    
+
+    Context ctx;
+
+    if (Object::object(ctx, skeleton).type() != Object::Type::Array) {
+        create_array();
+    }
+    
+    write_array();
+
+    read_array(skeleton);
+    read_array(dilated);
 
     return 0;
 }
