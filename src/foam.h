@@ -1,8 +1,5 @@
-#include <stdio.h>
-#include <cstdlib>
-#include <time.h>
-#include <math.h>
 #include <iostream>
+#include <math.h>
 #include <tiledb/tiledb>
 #include <arrayfire.h>
 #include <af/util.h>
@@ -10,41 +7,87 @@
 using namespace af;
 using namespace tiledb;
 
-class Foam
-{
+class Foam {
 private:
-    // Name of TileDB attribute
+    // name of TileDB attribute
     std::string attri;
     
-    int voxel_dim;
+    // name of TileDB arrays
+    std::string skeleton;
+    std::string dilation;
+    
+    // number of voxels along each axis in the array
+    int voxel_dim; //TODO: create cuboid voxel array with different edge lengths
+    
+    // number of voxels along each axis in a tile
     int tile_dim;
-    int offset;
+    
+    // radius of mask used for dilation
+    int radius;
+    
+    // mask used for dilation
+    array mask;
+    
+    // creates a 3D spherical mask of given radius (number of voxels)
+    void create_mask();
+    
+    // returns a 3D boolean AF array with global coordinates 'coords' set to 'true'
+    array create_af_array(const int dim, const std::vector<int>& coords,
+            const std::vector<int>& tile_coords);
+    
+    // returns dilated AF array - with or without padding
+    array dilate_af_array(const array& block, bool usePad = true);
+    
+    // gets non-zero (true) voxel coordinates from AF array
+    // uses tile_coords and mask_dims to transform local to global coordinates
+    void get_nz_coords(const array& block, std::vector<int>& coords,
+            const std::vector<int>& tile_coords);
     
     // spatial bounding box
-    std::vector<float> bb;
+    //std::vector<float> bb;
+    
+    // creates TileDB array
+    void create_tiledb_array(const std::string& array_name, const int voxel_dim,
+            const int tile_dim);
+    
+    // write data in TileDB array
+    void write_tiledb_array(const std::string& array_name, std::vector<char>& data,
+            std::vector<int>& coords);
+    
+    // reads data from a fragmant (tile_coords) of TileDB array
+    void read_tiledb_array(const std::string& array_name, const std::vector<int>& tile_coords,
+            std::vector<char>& data, std::vector<int>& coords);
     
 public:
-    // Name of TileDB arrays
-    std::string skeleton;
-    std::string dilated;
-    
     Foam();
+    Foam(int v_dim, int t_dim, int rad);
     
-    void dilate(const array& mask);// dilates 3D array block using the 3D mask
-    array dilate_block(const array& block, const array& mask, bool usePad);
-    array create_af_array(const int dim, const std::vector<int>& coords);
-    void get_true_coords(const array& block, std::vector<int>& coords,
-                            std::vector<int>& tile_coords, dim4 mask_dims);
+    // deletes old TileDB array and creates new ones
+    void reset();
+    void reset_skeleton();
+    void reset_dilation();
     
-    void spatial_to_voxel(const std::vector<float>& s_coords, std::vector<int>& v_coords);
-    void voxel_to_spatial(const std::vector<int>& v_coords, std::vector<float>& s_coords);
+    // setters
+    void set_dims(int v_dim, int t_dim);
+    void set_mask_radius(int rad);
     
-    void create_tiledb_array(const std::string array_name, const int voxel_dim,
-                                const int tile_dim);
-    void write_tiledb_array(const std::string array_name, std::vector<char>& data,
-                                std::vector<int>& coords);
-    void read_tiledb_array(const std::string array_name, const std::vector<int> slice_coords,
-                                std::vector<char>& data, std::vector<int>& coords);
-    void read_tiledb_array_relative(const std::string array_name, const std::vector<int> slice_coords,
-                                std::vector<char>& data, std::vector<int>& coords);
+    // dilates the skeleton
+    void dilate();
+    
+    // saves image of a z-plane in dilation
+    void save_tile_image_Z(const std::vector<int>& tile_coords, const int z_idx,
+            const char* filename);
+    
+    // create, write, and read TileDB arrays 'skeleton' and 'dilation'
+    void create_skeleton(const int voxel_dim, const int tile_dim);
+    void create_dilation(const int voxel_dim, const int tile_dim);
+    void write_skeleton(std::vector<char>& data, std::vector<int>& coords);
+    void write_dilation(std::vector<char>& data, std::vector<int>& coords);
+    void read_skeleton(const std::vector<int>& tile_coords, std::vector<char>& data,
+            std::vector<int>& coords);
+    void read_dilation(const std::vector<int>& tile_coords, std::vector<char>& data,
+            std::vector<int>& coords);
+
+    //void spatial_to_voxel(const std::vector<float>& s_coords, std::vector<int>& v_coords);
+    //void voxel_to_spatial(const std::vector<int>& v_coords, std::vector<float>& s_coords);
 };
