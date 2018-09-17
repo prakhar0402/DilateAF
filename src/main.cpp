@@ -7,6 +7,8 @@
 #include <arrayfire.h>
 #include <af/util.h>
 
+#include <foam.h>
+
 using namespace af;
 using namespace tiledb;
 
@@ -247,6 +249,9 @@ int main(int argc, char** argv)
         throw;
     }
     
+    Foam foam;
+    
+    /*
     int voxel_dim = 256;
     int tile_dim = 64;
     
@@ -260,20 +265,32 @@ int main(int argc, char** argv)
         create_tiledb_array(skeleton, voxel_dim, tile_dim);
         create_tiledb_array(dilated, voxel_dim, tile_dim);
     }
+    */
     
+    //TODO: implement line drawing
     std::vector<int> coords;
-    for (int i = 20; i < 236; i++)
-        coords.insert(coords.end(), {i, i, i});
+    for (int i = 0; i < 256; i++)
+        coords.insert(coords.end(), {60, 60, i});
     std::vector<char> data(coords.size()/3, '1');
-    write_tiledb_array(skeleton, data, coords);
-
+    write_tiledb_array(foam.skeleton, data, coords);
+    
+    
+    array mask = create_mask(5);
+    foam.dilate(mask);
+    
+    std::vector<char> sk_data, di_data;
+    std::vector<int> sk_coords, di_coords;
+    std::vector<int> slice_coords = {64, 127, 64, 127, 64, 127};
+    read_tiledb_array(foam.dilated, slice_coords, di_data, di_coords);
+    
+    
+    /*
     std::vector<char> sk_data, di_data;
     std::vector<int> sk_coords, di_coords;
     std::vector<int> slice_coords = {0, tile_dim-1, 0, tile_dim-1, 0, tile_dim-1};
     read_tiledb_array(skeleton, slice_coords, sk_data, sk_coords);
     
     array block = create_af_array(tile_dim, sk_coords);
-    array mask = create_mask(10);
     array out = dilate_with_mask(block, mask, false);
     
     get_true_coords(out, di_coords, 0);
@@ -281,6 +298,6 @@ int main(int argc, char** argv)
     write_tiledb_array(dilated, datad, di_coords);
         
     read_tiledb_array(dilated, slice_coords, di_data, di_coords);
-
+    */
     return 0;
 }

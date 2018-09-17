@@ -48,25 +48,21 @@ else()
   add_compile_options(-Wno-error=format)
 endif()
 
-if(ArrayFire_CPU_FOUND)
-  add_executable(dilateAF_cpu ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
-  target_link_libraries(dilateAF_cpu ArrayFire::afcpu)
-endif()
+add_executable(dilateAF ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
+                    ${CMAKE_CURRENT_SOURCE_DIR}/src/foam.cpp)
 
 if(ArrayFire_CUDA_FOUND)
-  add_executable(dilateAF_cuda ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
-  target_link_libraries(dilateAF_cuda ArrayFire::afcuda)
+    target_link_libraries(dilateAF ArrayFire::afcuda)
+elseif(ArrayFire_OpenCL_FOUND)
+    target_link_libraries(dilateAF ArrayFire::afopencl)
+elseif(ArrayFire_CPU_FOUND)
+    target_link_libraries(dilateAF ArrayFire::afcpu)
 endif()
 
-if(ArrayFire_OpenCL_FOUND)
-  add_executable(dilateAF_opencl ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
-  target_link_libraries(dilateAF_opencl ArrayFire::afopencl)
-endif()
-
-#target_include_directories(test_tdb PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/../")
-target_link_libraries(dilateAF_cpu TileDB::tiledb_shared)
+target_include_directories(dilateAF PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/)
+target_link_libraries(dilateAF TileDB::tiledb_shared)
 
 # On Linux, must explicitly link -lpthread -ldl in order for static linking
 # to libzstd or libcurl to work.
-target_link_libraries(dilateAF_cpu pthread dl)
+target_link_libraries(dilateAF pthread dl)
 
