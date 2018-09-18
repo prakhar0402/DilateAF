@@ -76,9 +76,8 @@ public:
     // dilates the skeleton
     void dilate();
     
-    // saves image of a z-plane in a tile of dilation
-    void save_tile_image_Z(const std::vector<int>& tile_coords, const int z_idx,
-            const char* filename);
+    // saves image of a sliced plane at the specified height along an axis in dilation
+    void save_slice_image(const char* filename, const int height, const int axis = 2);
     
     // create, write, and read TileDB arrays 'skeleton' and 'dilation'
     void create_skeleton(const int voxel_dim, const int tile_dim);

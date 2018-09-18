@@ -161,14 +161,27 @@ void Foam::dilate() {
             }
 }
 
-void Foam::save_tile_image_Z(const std::vector<int>& tile_coords, const int z_idx,
-            const char* filename) {
+void Foam::save_slice_image(const char* filename, const int height, const int axis) {
+    std::vector<int> slice_coords;
+    if (axis == 0)
+        slice_coords = {height, height, 0, voxel_dim-1, 0, voxel_dim-1};
+    else if (axis == 1)
+        slice_coords = {0, voxel_dim-1, height, height, 0, voxel_dim-1};
+    else
+        slice_coords = {0, voxel_dim-1, 0, voxel_dim-1, height, height};
+    
     std::vector<char> data(1, '1'); // dummy initialization
     // TileDB bug: sometimes throws an error if uninitialized
     std::vector<int> coords(3, 0);
-    read_dilation(tile_coords, data, coords);
-    array block = create_af_array(coords, tile_coords);
-    saveImage(filename, block.slice(z_idx));
+    read_dilation(slice_coords, data, coords);
+    array block = create_af_array(coords, slice_coords);
+    
+    if (axis == 0)
+        saveImage(filename, reorder(block, 1, 2, 0));
+    else if (axis == 1)
+        saveImage(filename, reorder(block, 2, 0, 1));
+    else
+        saveImage(filename, block);
 }
 
 void Foam::create_skeleton(const int voxel_dim, const int tile_dim) {

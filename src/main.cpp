@@ -46,10 +46,12 @@ int main(int argc, char** argv) {
     std::cout << "** Dilation complete in " << elapsed << " secs! **" << std::endl;
     
     // testing
-    std::vector<int> tile_coords = {0, 255, 0, 255, 29, 35};
-    foam.save_tile_image_Z(tile_coords, 0, "z029.png");
-    foam.save_tile_image_Z(tile_coords, 3, "z032.png");
-    foam.save_tile_image_Z(tile_coords, 6, "z035.png");
+    // save images at different heights along different axes
+    foam.save_slice_image("slice_Z_029.png", 29, 2);
+    foam.save_slice_image("slice_Z_032.png", 32, 2);
+    foam.save_slice_image("slice_Z_035.png", 35, 2);
+    foam.save_slice_image("slice_X_033.png", 33, 0);
+    foam.save_slice_image("slice_Y_033.png", 33, 1);
     
     return 0;
 }
