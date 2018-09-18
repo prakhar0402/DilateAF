@@ -13,8 +13,8 @@ $ ./dilateAF
 ```
 
 ### Dependencies:
-* [ArrayFire] (http://arrayfire.org/)
-* [TileDB] (https://tiledb.io/)
+* [ArrayFire](http://arrayfire.org/)
+* [TileDB](https://tiledb.io/)
 
 #### Installation instructions for ArrayFire on Ubuntu:
 * use [ArrayFire (AF) Installation Instructions for Linux](https://github.com/arrayfire/arrayfire/wiki/Build-Instructions-for-Linux) with CPU backend - install all dependencies
