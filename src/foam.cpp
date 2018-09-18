@@ -91,9 +91,11 @@ array Foam::create_mask() {
 }
 */
 
-array Foam::create_af_array(const int dim, const std::vector<int>& coords,
+array Foam::create_af_array(const std::vector<int>& coords,
             const std::vector<int>& tile_coords) {
-    array block = constant(0, dim, dim, dim, b8);
+    array block = constant(0, tile_coords[1] - tile_coords[0] + 1,
+                                tile_coords[3] - tile_coords[2] + 1,
+                                tile_coords[5] - tile_coords[4] + 1, b8);
     for (int i = 0; i < coords.size()/3; i++)
         block(coords[3*i]-tile_coords[0], coords[3*i+1]-tile_coords[2],
                     coords[3*i+2]-tile_coords[4], 0) = true;
@@ -132,20 +134,11 @@ void Foam::get_nz_coords(const array& block, std::vector<int>& coords,
         coords.insert(coords.end(), {x, y, z});
     }
 }
-/*
-void Foam::get_nz_coords(const array& block, std::vector<int>& coords) {
-    dim4 dims = block.dims();
-    for (int i = 0; i < dims[0]; i++)
-        for (int j = 0; j < dims[1]; j++)
-            for (int k = 0; k < dims[2]; k++)
-                if (block(i, j, k).scalar<bool>())
-                //if (sum<int>(block(i, j, k)) > 0)
-                    coords.insert(coords.end(), {i, j, k});
-}*/
 
 void Foam::dilate() {
-    std::vector<char> sk_data, di_data;
-    std::vector<int> sk_coords, di_coords;
+    std::vector<char> sk_data(1, '1'), di_data(1, '1'); // dummy initialization
+    // TileDB bug: sometimes throws an error if uninitialized
+    std::vector<int> sk_coords(3, 0), di_coords(3, 0);
     array block, di_block;
     std::vector<int> tile_coords(6, 0);
     for (int i = 0; i < voxel_dim; i += tile_dim)
@@ -158,7 +151,7 @@ void Foam::dilate() {
                 if (sk_coords.size() == 0) continue; // skips if tile is empty
                 
                 // creates a temporary AF array and dilates it
-                block = create_af_array(tile_dim, sk_coords, tile_coords);
+                block = create_af_array(sk_coords, tile_coords);
                 di_block = dilate_af_array(block, true);
                 
                 // saves the dilated AF array in TileDB array 'dilation'
@@ -170,10 +163,11 @@ void Foam::dilate() {
 
 void Foam::save_tile_image_Z(const std::vector<int>& tile_coords, const int z_idx,
             const char* filename) {
-    std::vector<char> data;
-    std::vector<int> coords;
+    std::vector<char> data(1, '1'); // dummy initialization
+    // TileDB bug: sometimes throws an error if uninitialized
+    std::vector<int> coords(3, 0);
     read_dilation(tile_coords, data, coords);
-    array block = create_af_array(tile_dim, coords, tile_coords);
+    array block = create_af_array(coords, tile_coords);
     saveImage(filename, block.slice(z_idx));
 }
 

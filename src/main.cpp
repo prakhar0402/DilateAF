@@ -1,5 +1,6 @@
 #include <iostream>
 #include <math.h>
+#include <time.h>
 #include <tiledb/tiledb>
 #include <arrayfire.h>
 #include <af/util.h>
@@ -32,23 +33,23 @@ int main(int argc, char** argv) {
     //TODO: implement line drawing
     // creates an arbitrary skeleton for testing
     std::vector<int> coords;
-    for (int i = 0; i < 256; i++)
-        coords.insert(coords.end(), {62, i, i});
+    for (int i = 20; i < 236; i++) {
+        coords.insert(coords.end(), {i, i, 32});
+    }
     std::vector<char> data(coords.size()/3, '1');
     foam.write_skeleton(data, coords);
     
     // dilate skeleton
+    clock_t start = clock();
     foam.dilate();
-    std::cout << "** Dilation complete! **" << std::endl;
+    float elapsed = (float)(clock() - start) / (float)CLOCKS_PER_SEC;
+    std::cout << "** Dilation complete in " << elapsed << " secs! **" << std::endl;
     
     // testing
-    std::vector<char> di_data;
-    std::vector<int> di_coords;
-    std::vector<int> tile_coords = {64, 127, 64, 127, 64, 127};
-    
-    foam.save_tile_image_Z(tile_coords, 0, "z064.png");
-    foam.save_tile_image_Z(tile_coords, 31, "z095.png");
-    foam.save_tile_image_Z(tile_coords, 63, "z127.png");
+    std::vector<int> tile_coords = {0, 255, 0, 255, 29, 35};
+    foam.save_tile_image_Z(tile_coords, 0, "z029.png");
+    foam.save_tile_image_Z(tile_coords, 3, "z032.png");
+    foam.save_tile_image_Z(tile_coords, 6, "z035.png");
     
     return 0;
 }

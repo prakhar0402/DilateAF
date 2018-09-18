@@ -7,6 +7,8 @@
 using namespace af;
 using namespace tiledb;
 
+// This class creates two TileDB arrays - one for skeleton structure and the other for its dilation
+// It uses ArrayFire to dilate skeleton in chunks efficiently and unions the output
 class Foam {
 private:
     // name of TileDB attribute
@@ -32,7 +34,7 @@ private:
     void create_mask();
     
     // returns a 3D boolean AF array with global coordinates 'coords' set to 'true'
-    array create_af_array(const int dim, const std::vector<int>& coords,
+    array create_af_array(const std::vector<int>& coords,
             const std::vector<int>& tile_coords);
     
     // returns dilated AF array - with or without padding
@@ -62,7 +64,7 @@ public:
     Foam();
     Foam(int v_dim, int t_dim, int rad);
     
-    // deletes old TileDB array and creates new ones
+    // deletes old TileDB arrays and creates new ones
     void reset();
     void reset_skeleton();
     void reset_dilation();
@@ -74,7 +76,7 @@ public:
     // dilates the skeleton
     void dilate();
     
-    // saves image of a z-plane in dilation
+    // saves image of a z-plane in a tile of dilation
     void save_tile_image_Z(const std::vector<int>& tile_coords, const int z_idx,
             const char* filename);
     

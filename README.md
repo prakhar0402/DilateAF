@@ -9,7 +9,7 @@ $ mkdir build
 $ cd build
 $ cmake -DArrayFire_DIR=/path/to/arrayfire/build ..
 $ make
-$ ./dilateAF_cpu
+$ ./dilateAF
 ```
 
 ### Dependencies:
