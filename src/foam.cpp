@@ -154,9 +154,8 @@ void Foam::get_nz_coords(const array& block, std::vector<int>& coords,
 }
 
 void Foam::dilate() {
-    std::vector<char> sk_data(1, '1'), di_data(1, '1'); // dummy initialization
-    // TileDB bug: sometimes throws an error if uninitialized
-    std::vector<int> sk_coords(3, 0), di_coords(3, 0);
+    std::vector<char> sk_data, di_data;
+    std::vector<int> sk_coords, di_coords;
     array block, di_block;
     std::vector<int> tile_coords(6, 0);
     for (int i = 0; i < voxel_dim; i += tile_dim)
@@ -188,9 +187,8 @@ void Foam::save_slice_image(const char* filename, const int height, const int ax
     else
         slice_coords = {0, voxel_dim-1, 0, voxel_dim-1, height, height};
     
-    std::vector<char> data(1, '1'); // dummy initialization
-    // TileDB bug: sometimes throws an error if uninitialized
-    std::vector<int> coords(3, 0);
+    std::vector<char> data;
+    std::vector<int> coords;
     read_dilation(slice_coords, data, coords);
     array block = create_af_array(coords, slice_coords);
     
@@ -281,28 +279,32 @@ void Foam::read_tiledb_array(const std::string& array_name, const std::vector<in
     auto max_el = array.max_buffer_elements(tile_coords);
     data.resize(max_el[attri].second);
     coords.resize(max_el[TILEDB_COORDS].second);
+    
+    // Check if non-empty
+    if (max_el[attri].second != 0) {
+        // Prepare the query
+        Query query(ctx, array, TILEDB_READ);
+        query.set_subarray(tile_coords)
+            .set_layout(TILEDB_ROW_MAJOR)
+            .set_buffer(attri, data)
+            .set_coordinates(coords);
 
-    // Prepare the query
-    Query query(ctx, array, TILEDB_READ);
-    query.set_subarray(tile_coords)
-        .set_layout(TILEDB_ROW_MAJOR)
-        .set_buffer(attri, data)
-        .set_coordinates(coords);
+        // Submit the query
+        query.submit();
 
-    // Submit the query and close the array.
-    query.submit();
+        // Print out the results.
+        /*std::cout << array_name << " data: ";
+        std::cout << "(" << tile_coords[0] << ", " << tile_coords[2] << ", "
+                << tile_coords[4] << ") - ";
+        std::cout << "- (" << tile_coords[1] << ", " << tile_coords[3] << ", "
+                << tile_coords[5] << ")" << std::endl;*/
+        auto result_num = (int)query.result_buffer_elements()[attri].second;
+        //std::cout << "Number of entries = " << result_num << std::endl;
+        data.resize(result_num);
+        coords.resize(result_num*3);
+    }
+    // Close the array
     array.close();
-
-    // Print out the results.
-    /*std::cout << array_name << " data: ";
-    std::cout << "(" << tile_coords[0] << ", " << tile_coords[2] << ", "
-            << tile_coords[4] << ") - ";
-    std::cout << "- (" << tile_coords[1] << ", " << tile_coords[3] << ", "
-            << tile_coords[5] << ")" << std::endl;*/
-    auto result_num = (int)query.result_buffer_elements()[attri].second;
-    //std::cout << "Number of entries = " << result_num << std::endl;
-    data.resize(result_num);
-    coords.resize(result_num*3);
 }
 
 /*
